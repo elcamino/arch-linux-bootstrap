@@ -1,0 +1,4 @@
+Interface=ens3
+Connection=ethernet
+IP=dhcp
+

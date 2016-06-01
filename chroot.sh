@@ -1,15 +1,67 @@
 #!/bin/sh
 
-pacman -S --noconfirm vim htop lsof linux-lts sudo ntp openssh ruby go go-tools git lua
+WITH_GO=0
+WITH_RUBY=0
+WITH_GIT=0
+USER="arch"
+PASSWORD="rHDW5xp4hDyaU" # arch
+
+
+for i in "$@"; do
+	case $i in
+			-u=*|--user=*)
+			USER="${i#*=}"
+			shift
+			;;
+			-p=*|--password=*)
+			PASSWORD="${i#*=}"
+			shift
+			;;
+			--with-go=*)
+			WITH_GO="${i#*=}"
+			shift
+			;;
+			--with-ruby=*)
+			WITH_RUBY="${i#*=}"
+			shift
+			;;
+			--with-git=*)
+			WITH_GIT="${i#*=}"
+			shift
+			;;
+			*)
+							# unknown option
+			;;
+	esac
+done
+
+
+
+pacman -S --noconfirm vim htop lsof linux-lts sudo ntp openssh lua
+pacman -R --noconfirm linux
+
+if [ $WITH_GO != 0 ]; then
+  pacman -S --noconfirm go go-tools
+fi
+
+if [ $WITH_RUBY != 0 ]; then
+	pacman -S --noconfirm ruby
+fi
+
+if [ $WITH_GIT != 0 ]; then
+	pacman -S --noconfirm git
+fi
+
 
 #
 # USERS
 #
-user="jay"
+user=$USER
 
 echo "root:root" | chpasswd
 
 useradd -m -G wheel -U -p eCxS1fXJO8oqQ $user
+echo "$user:$user" | chpasswd
 
 #
 # VIM
@@ -23,11 +75,13 @@ chown -R $user:$user /home/$user/.vim*
 #
 # GO
 #
-install -d -o $user -g $user -m 775 /home/$user/go/src
-chown -R $user:$user /home/$user/go
-printf "\nGOPATH=/home/$user/go\nexport GOPATH\nPATH=\"\$GOPATH/bin:$PATH\"\n" >> /home/$user/.bashrc
+if [ $WITH_GO != 0 ]; then
+	install -d -o $user -g $user -m 775 /home/$user/go/src
+	chown -R $user:$user /home/$user/go
+	printf "\nGOPATH=/home/$user/go\nexport GOPATH\nPATH=\"\$GOPATH/bin:$PATH\"\n" >> /home/$user/.bashrc
 
-env GOPATH=/home/$user/go PATH="/home/$user/go/bin:$PATH" go get github.com/nsf/gocode
+	env GOPATH=/home/$user/go PATH="/home/$user/go/bin:$PATH" go get github.com/nsf/gocode
+fi
 
 #
 # SUDO
@@ -44,12 +98,7 @@ systemctl enable serial-getty@ttyS0.service
 # SSH
 #
 install -d -o $user -g $user -m 700 /home/$user/.ssh
-cat > /home/$user/.ssh/authorized_keys <<EOF
-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDC/5Envdwo+ZzMQyE0179R3Ohl082rK2XFXrqW871oKmjUQVwmlGj7qi42hFkNld0T2Q9yJdleNHZAwUIkIVAEo2GcZ3T7OXfvKe7HpcmN9Gt1IHLBzSbKaG9LuBA4VFCRjI5p5SBerrOreVJOwKGFjSMkUqtHOvykKsAQA6gfzQg6/nJSvrhVDPdVnRz6iocICjzsLBL5G4hJefJN+YCSd6PgCjeAqivrZ/lJCL5mbECdgZbDGpm8yhj0yJPMKpsGIT+/yAfSI6VwleovL33BohT0MUCBvHOR95BTcQNjCx9qTrlmOXeBso4P4ujzXqa+PzX6LVGhrDipKvTRl+v3 jay
-EOF
-
-chown $user:$user /home/$user/.ssh/authorized_keys
-chmod 600 /home/$user/.ssh/authorized_keys
+install -m 600 -o $user -g $user /bootstrap/ssh/authorized_keys /home/$user/.ssh/
 
 systemctl enable sshd
 
@@ -59,8 +108,20 @@ systemctl enable sshd
 systemctl enable ntpd
 
 #
+# RESIZE THE ROOT FILESYSTEM
+#
+systemctl enable resize-rootfs
+
+#
 # ENABLE NETWORK
 #
-netctl enable ens3
 
+for f in /bootstrap/network/*; do
+	interface=`basename $f`
+	netctl enable $interface
+done
+
+#
+# LOCK DOWN THE ROOT LOGIN
+#
 passwd -l root

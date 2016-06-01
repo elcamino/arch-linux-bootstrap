@@ -1,0 +1,13 @@
+[Unit]
+Description=Resize Root Filesystem
+After=systemd-remount-fs.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/resize2fs /dev/vda
+TimeoutSec=60s
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+
+print_issue() {
+    cat /usr/local/share/issuegen/issue-header.txt
+    echo
+    echo 'This is \n (\s \m \r) \t'
+    for note in /run/issue.d/*; do
+        [ -f "${note}" ] && cat "${note}"
+    done
+    echo
+}
+
+case "$1" in
+    add)
+        mkdir -p /run/issue.d
+        echo "${2}: \\4{${2}} \\6{${2}}" > "/run/issue.d/${2}"
+        ;;
+    remove)
+        rm -f "/run/issue.d/${2}"
+        ;;
+esac
+
+print_issue > /etc/issue
